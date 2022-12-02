@@ -152,7 +152,7 @@ class WebDriverTorso:
         while not last_media_found:
             try:
                 img_element = self.driver.find_element('xpath', '//div[@class = "_aa64"]').find_element(By.TAG_NAME, 'img').get_attribute('src')
-                if "blob" in video_element:
+                if "blob" in img_element:
                     print("blob object found, not supported by this scraper")
                 else:
                     if img_element and img_element not in self.img_urls:
@@ -165,7 +165,7 @@ class WebDriverTorso:
                 if "blob" in video_element:
                     print("blob object found, not supported by this scraper")
                 else:
-                    if video_element and video_element not in self.img_urls:
+                    if video_element and video_element not in self.video_urls:
                         self.video_urls.append(video_element)
             except:
                 print("Current story does not contain any video")
@@ -244,12 +244,12 @@ class WebDriverTorso:
 
     
     def run(self):
-        #load the page at the beginning of the execution and wait for 5 seconds for page to load
+        #load the page at the beginning of the execution and wait for 3 seconds for page to load
         if self.requiresLogIn:
             self.login()
 
         self.driver.get(self.target_url)
-        self.driver.implicitly_wait(5)
+        self.driver.implicitly_wait(3)
 
         if '/p/' in self.target_url:
             print("Post url provided, scraping photos from provided post")
