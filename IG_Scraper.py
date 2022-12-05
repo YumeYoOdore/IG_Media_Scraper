@@ -100,40 +100,39 @@ class WebDriverTorso:
         #used to construct the output filename based on the file to download
         #convention I came up with: 
         #"{user_name}_IG_{media_type}_download_{post_key}.{file_extention}
-        output_filename = ''
-        
         file_type = 'video' if file_extention == "mp4" else "image"
-        output_filename = f'{self.user_name}_IG_{file_type}_download_{post_url_string}.{file_extention}'
-        return output_filename 
+
+        return f'{self.user_name}_IG_{file_type}_download_{post_url_string}.{file_extention}'
 
 
     def save_files(self, post_url_string):
         #this can also be handled in bash
+        if not self.img_urls and not self.video_urls:
+            print("No images nor videos were retrieved, finishing execution")
+            self.driver.quit()
+            exit(0)
+
         path = os.getcwd()
+        
         save_dir = os.path.join(path, "save_dir", self.user_name + "_downloads")
 
+        #1. Create the path to save the files
         if not os.path.exists(save_dir):
             os.mkdir(save_dir)
 
-        counter = 0
+        #Since the saving process is the same, instead of repeating the lines twice made a function to be called twice
+        self.save(post_url_string, save_dir, 'jpg') #this is for saving images
+        self.save(post_url_string, save_dir, 'mp4') #this is for saving videos
+        
 
+    def save(self, post_url_string, save_dir, format):
         #for saving image files
-        for url in self.img_urls:
-            file_extention = "jpg"
-
-            output_filename = self.get_output_filename(file_extention, post_url_string + "_" + str(counter))
-
-            save_as = os.path.join(save_dir, output_filename)
-            wget.download(url, save_as)
-            counter += 1
-
         counter = 0
+        urls_list = self.img_urls if format == "jpg" else self.video_urls
 
-        #for saving video files
-        for url in self.video_urls:
-            file_extention = "mp4"
+        for url in urls_list:
 
-            output_filename = self.get_output_filename(file_extention, post_url_string + "_" + str(counter))
+            output_filename = self.get_output_filename(format, post_url_string + "_" + str(counter))
 
             save_as = os.path.join(save_dir, output_filename)
             wget.download(url, save_as)
@@ -245,6 +244,12 @@ class WebDriverTorso:
     
     def run(self):
         #load the page at the beginning of the execution and wait for 3 seconds for page to load
+        
+        if "stories" in self.target_url:
+            print("Warning: to download stories please use the flag -s and provide IG user main page url")
+            self.target_url = '/'.join(self.target_url.split('/')[:5]).replace('/stories', '')
+            self.getUserStories = True
+
         if self.requiresLogIn:
             self.login()
 
