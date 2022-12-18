@@ -60,10 +60,14 @@ class WebDriverTorso:
     def get_target_user_info(self):
         #Doesn't seem to be a very reliable way to pull user name directly from a post, need to look for a more reliable way to pull this
         class_tag_string = config('TARGET_INFO_TAG_STR')
-        try:
-            self.user_name = self.driver.find_elements('xpath', '//a[contains(@class, "%s")]' % class_tag_string)[0].text
-        except:
-            print("Error retrieving poster username")
+        #check if url is not a post url, in this case pull username directly
+        if '/p/' not in self.target_url and 'highlights' not in self.target_url:
+            self.user_name = self.target_url.split('/')[-2]
+        else:
+            try:
+                self.user_name = self.driver.find_elements('xpath', '//a[contains(@class, "%s")]' % class_tag_string)[0].text
+            except:
+                print("Error retrieving poster username")
 
 
     def get_media_urls(self):
@@ -143,10 +147,15 @@ class WebDriverTorso:
         last_media_found = False
         post_url_string = self.driver.current_url.split('/')[-2]
 
-        stories_button = self.driver.find_element('xpath', '//div[@class = "_aarf _aarg"]')
-        if stories_button:
-            stories_button.click()
-            self.driver.implicitly_wait(2)
+        if 'highlights' in self.target_url:
+            #make sure we click the "view story button"
+            view_story = WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable(('xpath', '//button[contains(text(), "View story")]'))).click()
+        else:
+            stories_button = self.driver.find_element('xpath', '//div[@class = "_aarf _aarg"]')
+            
+            if stories_button:
+                stories_button.click()
+                self.driver.implicitly_wait(2)
 
         while not last_media_found:
             try:
@@ -237,23 +246,51 @@ class WebDriverTorso:
                 last_media_found = True
                 print("No next_button found : page only has one media item or already at last media, returning")
 
-        #in case we're calling this function directly from a post we'll need to retrieve target IG username from selenium
-        if not self.user_name:
-            self.get_target_user_info()
 
-    
+    def isUrlInvalid(self):
+        #Use this function to add conditions where url is not valid
+        #add them to a list and check if self.target_url matches one of the
+        #invalid conditions, in this case end execution immediately
+        invalid_url_patterns = {
+            'endswith': ['instagram.com/', 'inbox/'],
+            'notcontains': ['instagram.com'],
+        }
+
+        canContinue = True
+
+        for pattern in invalid_url_patterns.get('endswith'):
+            if self.target_url.endswith(pattern):
+                print(f'Invalid url provided: url={self.target_url}')
+                canContinue = False
+
+        for pattern in invalid_url_patterns.get('notcontains'):
+            if pattern not in self.target_url:
+                print(f'Invalid url provided: url={self.target_url}')
+                canContinue = False
+        
+        if not canContinue:
+            print("ERROR: Invalid url provided, exiting")
+            sys.exit(0)
+
+
     def run(self):
         #load the page at the beginning of the execution and wait for 3 seconds for page to load
-        
-        if "stories" in self.target_url:
-            print("Warning: to download stories please use the flag -s and provide IG user main page url")
-            self.target_url = '/'.join(self.target_url.split('/')[:5]).replace('/stories', '')
-            self.getUserStories = True
+        #before handling any logic check if url is invalid, case in which no process should be run
+        self.isUrlInvalid()
 
-        
         if 'reel' in self.target_url:
             print("WARNING: Reel URL Provided, currently not supported by this tool, providing reel posts URLs")
             self.recursiveDownload = False
+
+        if "stories" in self.target_url:
+            #check if "stories" url is invalid
+            if "highlights" not in self.target_url:
+                #try download stories if a invalid stories url was provided
+                print("Warning: to download stories please use the flag -s and provide IG user main page url")
+                self.target_url = '/'.join(self.target_url.split('/')[:5]).replace('/stories', '')
+
+            self.getUserStories = True
+            self.requiresLogIn = True
 
         if self.requiresLogIn:
             self.login()
@@ -261,17 +298,15 @@ class WebDriverTorso:
         self.driver.get(self.target_url)
         self.driver.implicitly_wait(3)
 
+        #Set self.user_name before running the entire logic
+        self.get_target_user_info()
+
         if '/p/' in self.target_url:
             print("Post url provided, scraping photos from provided post")
             self.post_pic_scrape()
             post_url_string = self.target_url.split('/')[4]
             self.save_files(post_url_string)
-
-        elif self.target_url.endswith('instagram.com/') or self.target_url.endswith('inbox/'):
-            print("IG main page provided or invalid IG URL provided, exiting")
-            sys.exit(0)
         else:
-            self.user_name = self.target_url.split('/')[-2]
             if self.getUserStories:
                 self.user_stories_scrape()
             else:
